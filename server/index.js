@@ -14,5 +14,5 @@ app.get('/', (req, res) => {
 
 /*האזנה לפורט*/
 app.listen(PORT, () => {
-    console.log(`השרת מאזין בפורט ${PORT}`);
+    console.log(`raning${PORT}`);
 });
