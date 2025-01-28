@@ -16,14 +16,27 @@ void WiFi_Setup(){
   Serial.println("");
   Serial.println("wifi connected");
 }
+//הפונקציה מקבלת פרמטרים 
 
-void sendData(){
+void sendData(float temp,int light,int moisture ){
+
   HTTPClient http;
-  http.begin(client,"http://10.9.0.188:3011/esp/");
+  //כל מה שיהיה אחרי הסימן שאלה זה פרמטרים 
+  String url="temp="+String(temp);
+  //כאשר שולחים מספר נתונים חייבים &
+  url+= "&light="+String(light);
+  url+="&moisture="+String(moisture);
+  Serial.println(url);
+  http.begin(client,"http://10.9.1.83:3011/esp?"+url);
+  //כששולחים דרך URL זה GET 
   int httpCode=http.GET();
+
   if(httpCode==HTTP_CODE_OK){
     Serial.print("HTTP RESPONSE CODE");
     Serial.println(httpCode);
   }
+
+  
+
   http.end();
 }

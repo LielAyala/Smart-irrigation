@@ -16,7 +16,7 @@ const esp=require('./routes/esp');
 app.use('/esp',esp);
 
 
-app.use(express.json());
+app.use(express.json());http://10.9.1.83:3011/esp?
 app.use(cors());
 app.use(morgan('dev'));
 dotenv.config();

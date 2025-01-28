@@ -7,7 +7,12 @@ const router=express.Router();
 
 //מתחיל לבנות ניתוב 
 router.get('/',(req,res)=>{
-    console.log("hii");
+    const {temp,light,moisture}=req.query;
+
+    console.log(req.query);
+
+    console.log(light);
+    console.log(moisture);
   
 })
 
