@@ -1,0 +1,22 @@
+{
+    
+    "state":"64",
+    "TEMP_MODE":{
+        "temp":23.50,
+        "minTime":1,
+        "maxTime":3
+        
+    }
+    ,
+    "SOIL_MOISTURE_MODE":{
+
+
+    }
+    ,
+    "SATURDAY_MODE":{
+
+    },
+     "MANUAL_MODE":{
+
+     }
+}

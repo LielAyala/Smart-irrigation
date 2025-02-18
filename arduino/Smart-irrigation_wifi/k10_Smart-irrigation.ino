@@ -40,3 +40,56 @@ void sendData(float temp,int light,int moisture ){
 
   http.end();
 }
+int GetState(){
+  int ret = -1;
+  HTTPClient http;
+  // http.begin(client, "http://10.0.0.14:5050/esp/state"); // home ip
+  http.begin(client, "http://10.9.0.19:5050/esp/state"); // Kinneret College ip
+  int httpCode = http.GET();
+  Serial.print(httpCode);
+  if (httpCode == HTTP_CODE_OK){
+  Serial.print("HTTP response code");
+  Serial.print(httpCode); 
+  String Res = http.getString();
+  Serial.print(Res);
+  ret = Res.toInt();
+  }
+  http.end();
+  return ret;
+}
+
+String getJsonData(String state) {
+  String Json = "";  
+  HTTPClient http;
+  http.begin(client, "http://10.0.0.14:5050/esp/DataMode?state=" + state);
+  int httpCode = http.GET();
+  Serial.print(httpCode);
+
+  if (httpCode == HTTP_CODE_OK) {
+    Serial.println(" HTTP response code: " + String(httpCode));
+    Json = http.getString(); // שומר את התגובה ב-Json
+    Serial.println("Response: " + Json);
+  } else {
+    Serial.println("Failed to get JSON data!");
+  }
+
+  http.end();
+  return Json; // עכשיו זה מחזיר את המידע התקין
+}
+
+
+// String getJsonData(String state){
+//   String Json = "";
+//   HTTPClient http;
+//   http.begin(client, "http://10.0.0.14:5050/esp/DataMode?state=" + state);
+//   int httpCode = http.GET();
+//   Serial.print(httpCode);
+//   if (httpCode == HTTP_CODE_OK){
+//   Serial.print("HTTP response code");
+//   Serial.print(httpCode); 
+//   String Res = http.getString();
+//   Serial.print(Res);
+//   }
+//   http.end();
+//   return Json;
+// }
