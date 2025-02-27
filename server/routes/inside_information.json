@@ -1,0 +1,27 @@
+{
+    "state": "64",
+    "TEMP_MODE": {
+        "temp": 25.5,
+        "minTime": 1,
+        "maxTime": 3
+    },
+    "SOIL_MOISTURE_MODE": {
+        "moisture": 60,
+        "minMoisture": 40,
+        "maxMoisture": 70
+    },
+    "SATURDAY_MODE": {
+        "enabled": true,
+        "schedule": "8:00 AM to 10:00 AM"
+    },
+    "MANUAL_MODE": {
+        "enabled": true,
+        "manualActions": [
+            "Activate pump",
+            "Turn on irrigation system"
+        ]
+    },
+    "LIGHT_MODE": {
+        "light": 70
+    }
+}
