@@ -1,22 +1,24 @@
 {
-    
-    "state":"64",
-    "TEMP_MODE":{
-        "temp":23.50,
-        "minTime":1,
-        "maxTime":3
-        
-    }
-    ,
-    "SOIL_MOISTURE_MODE":{
-
-
-    }
-    ,
-    "SATURDAY_MODE":{
-
+    "state": "64",
+    "TEMP_MODE": {
+        "temp": 23.50,
+        "minTime": 1,
+        "maxTime": 3
     },
-     "MANUAL_MODE":{
-
-     }
+    "SOIL_MOISTURE_MODE": {
+        "moisture": 55.0,
+        "minMoisture": 40.0,
+        "maxMoisture": 70.0
+    },
+    "SATURDAY_MODE": {
+        "enabled": true,
+        "schedule": "8:00 AM to 10:00 AM"
+    },
+    "MANUAL_MODE": {
+        "enabled": true,
+        "manualActions": [
+            "Activate pump",
+            "Turn on irrigation system"
+        ]
+    }
 }
