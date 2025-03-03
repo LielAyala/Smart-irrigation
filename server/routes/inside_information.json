@@ -1,7 +1,7 @@
 {
     "state": "64",
     "TEMP_MODE": {
-        "temp": 25.5,
+        "temp": 19.2,
         "minTime": 1,
         "maxTime": 3
     },
@@ -22,6 +22,6 @@
         ]
     },
     "LIGHT_MODE": {
-        "light": 70
+        "light": 0
     }
 }
