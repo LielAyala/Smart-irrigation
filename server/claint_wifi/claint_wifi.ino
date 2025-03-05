@@ -1,147 +1,119 @@
-#include <WiFi.h>         // ספרייה לניהול חיבור לרשת Wi-Fi
-#include <WiFiClient.h>   // ספרייה לעבודה עם חיבור Wi-Fi
-#include <HTTPClient.h>   // ספרייה לשליחת בקשות HTTP
+#include <WiFi.h>  
+#include <WiFiClient.h>  
+#include <HTTPClient.h>  
 
-// פרטי חיבור לרשת Wi-Fi
-const char* ssid = "שם_הרשת_שלך";      // שם הרשת (SSID)
-const char* password = "הסיסמה_שלך";  // סיסמת ה-WiFi
+// **פרטי WiFi**
+const char* ssid = "ayala";      
+const char* password = "0502120218a";  
 
-WiFiClient client; // יצירת אובייקט חיבור Wi-Fi
+WiFiClient client;
+const char* serverUrl = "http://192.168.1.160:3011/esp/updateSensors";  
+const char* stateUrl = "http://192.168.1.160:3011/esp/state";  
 
-// כתובת השרת
-const char* serverUrl = "http://192.168.1.160:3011/esp/sendData"; // כתובת ה-API לשליחת נתונים
-const char* stateUrl = "http://192.168.1.160:3011/esp/state";      // כתובת ה-API לבדיקה תקופתית של מצב השרת
-
-// פונקציה לאתחול חיבור לרשת ה-WiFi
 void WiFi_Setup() {
-  Serial.begin(115200);       // הפעלת תקשורת סריאלית
-  delay(1000);                // השהיה קצרה לפני התחברות
-  WiFi.begin(ssid, password); // התחברות לרשת
-
-  Serial.println("מתחבר ל-Wi-Fi...");
-
-  while (WiFi.status() != WL_CONNECTED) { // לולאה עד שהחיבור יצליח
+ WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
-
-  Serial.println("\n✅ חיבור לרשת הצליח!");
-  Serial.print("📡 כתובת IP: ");
-  Serial.println(WiFi.localIP()); // הצגת כתובת ה-IP שהוקצתה ל-ESP
+  Serial.print("IP Address: ");
+  Serial.println("WiFi Connected");
 }
-
-// פונקציה לשליחת נתונים לשרת
-void sendData(float temp, int light, int moisture, int plantNumber) {
-  if (WiFi.status() == WL_CONNECTED) { // בדיקה אם יש חיבור לרשת
-    HTTPClient http; // יצירת אובייקט HTTP
-
-    http.begin(serverUrl); // התחלת בקשת HTTP
-    http.addHeader("Content-Type", "application/json"); // הגדרת הכותרת כ-JSON
-
-    // יצירת מחרוזת JSON עם הנתונים
-    String jsonPayload = "{\"sensorName\": \"all\", \"plantNumber\": " + String(plantNumber) +
-                         ", \"temp\": " + String(temp) + ", \"light\": " + String(light) + 
-                         ", \"moisture\": " + String(moisture) + "}";
-
-    Serial.println("📤 שולח נתונים לשרת: " + jsonPayload);
-
-    int httpResponseCode = http.POST(jsonPayload); // שליחת הבקשה
-
-    if (httpResponseCode > 0) { // אם הבקשה הצליחה
-      Serial.print("✅ תגובת השרת: ");
-      Serial.println(httpResponseCode);
-      String response = http.getString(); // קבלת תשובת השרת
-      Serial.println("📥 תשובת השרת: " + response);
-    } else { // אם הבקשה נכשלה
-      Serial.print("❌ שגיאה בשליחה! קוד שגיאה: ");
-      Serial.println(httpResponseCode);
-    }
-
-    http.end(); // סגירת החיבור
-  } else {
-    Serial.println("❌ אין חיבור לרשת, לא ניתן לשלוח נתונים!");
+//שולח את הנתונים של החיישנים לחות טמפרטורה אור
+void SendData(float temp, int light, int moisture) {
+  HTTPClient http;
+  String dataURL = "Temp=" + String(temp);
+  dataURL += "&Light=" + String(light);
+  dataURL += "&Moisture=" + String(moisture); 
+  http.begin(client, "http://192.168.1.160:3011/esp?" + dataURL); // home ip
+  int httpCode = http.GET();
+  if (httpCode == HTTP_CODE_OK) {
+    Serial.print("HTTP response code");
+    Serial.print(httpCode);
   }
+  http.end();
 }
+//פונקציה שמקבלת את המצב הנוכחי מהinside_information
+int getStatusFromServer() {  
+  HTTPClient http;  // יצירת אובייקט HTTPClient
+  int ret = -1;  // משתנה להחזרת המצב מהשרת
+  // כתובת ה-URL שמחזירה את המצב הנוכחי
+  String url = "http://192.168.1.160:3011/esp/dataMode";
+  Serial.print("🔹 שולח בקשת GET לכתובת: ");
+  Serial.println(url);
+  http.begin(url); // פתיחת החיבור לשרת
+  int httpCode = http.GET(); // שליחת בקשת GET
+  // בדיקה אם השרת החזיר תשובה תקינה (200 OK)
+  if (httpCode == HTTP_CODE_OK) {
+    Serial.print("✅ קיבלתי תשובה מהשרת, קוד: ");
+    Serial.println(httpCode);
 
-// פונקציה לקבלת מצב המערכת מהשרת
+    String response = http.getString(); // קריאת התגובה מהשרת
+    Serial.print("📌 תוכן התשובה: ");
+    Serial.println(response);
+    // חיפוש הערך `currentState` בתגובה מהשרת
+    int index = response.indexOf("currentState");
+    if (index != -1) {
+      response = response.substring(index + 14); // חותך את הטקסט אחרי "currentState":
+      response = response.substring(0, response.indexOf("}")); // מסיר סוגר סוגר
+      ret = response.toInt(); // ממיר למספר
+    }
+  } else {
+    Serial.print("❌ שגיאה בחיבור לשרת, קוד: ");
+    Serial.println(httpCode);
+  }
+  http.end(); // סגירת החיבור
+  return ret; // החזרת המצב שהתקבל מהשרת
+}
 int GetState() {
-  if (WiFi.status() == WL_CONNECTED) { // בדיקה אם יש חיבור
-    HTTPClient http; // יצירת אובייקט HTTP
-    http.begin(stateUrl); // התחלת בקשת GET לשרת
+  int ret = -1;
+  HTTPClient http;
+  http.begin(client, "http://192.168.1.160:3011/esp/state");  // home ip
+  int httpCode = http.GET();
+  Serial.print(httpCode);
+  if (httpCode == HTTP_CODE_OK) {
+    Serial.print("HTTP response code");
+    Serial.print(httpCode);
+    String Res = http.getString();
+    int start = Res.indexOf("\"CurrentStatus\":\"") + 17;  // מצא את המיקום של "CurrentStatus"
+    int end = Res.indexOf("\"", start);             // מצא את הסוף של הערך
+    String stateStr = Res.substring(start, end);    // קח את הערך של הסטייט
+    ret = stateStr.toInt();
+    Serial.print("Res = ");
+    Serial.println(Res);
+    Serial.println("***********************");
+    Serial.print("ret = ");
+    Serial.println(ret);
+    Serial.println("***********************");
+  }
+  http.end();
+  return ret;
+}
+String getJsonData(String state) {
+    String Json = "";
+    HTTPClient http;
 
-    int httpCode = http.GET(); // שליחת בקשה לקבלת מצב המערכת
+    // יצירת כתובת הבקשה לשרת עם הפרמטר המתאים
+    String url = "http://192.168.1.160:3011/esp/dataMode?state=" + state;
+    Serial.print("🔹 שולח בקשה לכתובת: ");
+    Serial.println(url);
 
-    if (httpCode == HTTP_CODE_OK) { // אם קיבלנו תשובה תקינה
-      String Res = http.getString(); // קבלת תשובת השרת
-      Serial.print("📥 מצב מערכת שהתקבל: ");
-      Serial.println(Res);
-      return Res.toInt(); // המרה למספר והחזרה
-    } else { // אם הבקשה נכשלה
-      Serial.println("❌ שגיאה בקבלת מצב המערכת!");
+    http.begin(url); // פתיחת החיבור
+    int httpCode = http.GET(); // שליחת בקשת GET
+
+    if (httpCode == HTTP_CODE_OK) {
+        Serial.print("✅ קיבלתי תשובה מהשרת, קוד: ");
+        Serial.println(httpCode);
+
+        Json = http.getString();  // שמירת הנתונים שהתקבלו
+        Serial.print("📌 תוכן התשובה: ");
+        Serial.println(Json);
+    } else {
+        Serial.print("❌ שגיאה בחיבור לשרת, קוד: ");
+        Serial.println(httpCode);
     }
 
     http.end(); // סגירת החיבור
-  } else {
-    Serial.println("❌ אין חיבור לרשת, לא ניתן לבדוק מצב!");
-  }
-
-  return -1; // במקרה של שגיאה נחזיר ערך ברירת מחדל
+    return Json; // החזרת הנתונים שהתקבלו
 }
 
-// #include <WiFi.h>
-// #include <HTTPClient.h>
-
-// // פרטי חיבור לרשת Wi-Fi
-// const char* ssid = "שם_הרשת_שלך";
-// const char* password = "הסיסמה_שלך";
-
-// // כתובת השרת
-// const char* serverUrl = "192.168.1.160";
-
-// void setup() {
-//   Serial.begin(115200); // הפעלת חיבור סריאלי
-//   delay(1000);
-
-//   // התחברות ל-Wi-Fi
-//   WiFi.begin(ssid, password);
-//   Serial.println("מתחבר ל-Wi-Fi...");
-  
-//   while (WiFi.status() != WL_CONNECTED) {
-//     delay(500);
-//     Serial.print(".");
-//   }
-  
-//   Serial.println("\nחיבור לרשת הצליח!");
-//   Serial.print("כתובת IP: ");
-//   Serial.println(WiFi.localIP());
-// }
-
-// void loop() {
-//   if (WiFi.status() == WL_CONNECTED) {
-//     HTTPClient http; // יצירת אובייקט HTTPClient
-    
-//     http.begin(serverUrl); // הגדרת כתובת השרת
-//     http.addHeader("Content-Type", "application/json"); // הוספת כותרת
-    
-//     // שליחת בקשת POST עם נתונים לדוגמה
-//     String jsonPayload = "{\"message\": \"Hello from ESP32!\"}";
-//     int httpResponseCode = http.POST(jsonPayload);
-    
-//     if (httpResponseCode > 0) {
-//       Serial.print("קוד תגובה: ");
-//       Serial.println(httpResponseCode);
-//       String response = http.getString();
-//       Serial.println("תשובת השרת:");
-//       Serial.println(response);
-//     } else {
-//       Serial.print("שגיאה בבקשה: ");
-//       Serial.println(httpResponseCode);
-//     }
-    
-//     http.end(); // סיום החיבור
-//   } else {
-//     Serial.println("איבדנו חיבור ל-Wi-Fi...");
-//   }
-  
-//   delay(10000); // השהיה של 10 שניות בין כל בקשה
-// }
