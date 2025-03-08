@@ -18,7 +18,7 @@ const pool = mysql.createPool({
     host: process.env.HOST || 'localhost',
     user: process.env.USER_DB || 'root',
     password: process.env.PASSWORD_DB || '',
-    database: process.env.DATABASE || 'plants_db'
+    database: process.env.DATABASE || 'smart-irrigation'
 });
 
 module.exports = pool.promise();

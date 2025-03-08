@@ -69,155 +69,90 @@ router.get('/dataMode', (req, res) => {
         res.status(500).json({ error: "Failed to retrieve data" });
     }
 });
+router.post('/sendSample', async (req, res) => {
+    try {
+        const { sensorName, measurementValue } = req.body;
 
-// router.get('/state', (req, res) => {
-//     try {
-//         let data = JSON.parse(fs.readFileSync(jsonFilePath, 'utf8'));
-//         res.json({ currentState: data.state }); // מחזיר את המצב הנוכחי של השרת
-//     } catch (error) {
-//         console.error("❌ שגיאה בקריאת המצב:", error);
-//         res.status(500).json({ error: "Failed to read current state" });
-//     }
-// });
+        console.log("📌 נתונים שהתקבלו מהארדואינו:", { sensorName, measurementValue });
+
+        if (!sensorName || measurementValue === undefined) {
+            return res.status(400).json({ message: '❌ נתונים חסרים, בדקו את השליחה מהארדואינו!' });
+        }
+
+        // בדיקה אם החיישן קיים בטבלה `sensors`
+        let [sensorResult] = await db.execute(`SELECT id FROM sensors WHERE name = ?`, [sensorName]);
+
+        if (sensorResult.length === 0) {
+            console.log(`🔍 חיישן ${sensorName} לא נמצא, מוסיף למסד הנתונים...`);
+            let [insertResult] = await db.execute(`INSERT INTO sensors (name, isRunning) VALUES (?, 1)`, [sensorName]);
+
+            if (!insertResult.insertId || insertResult.insertId === 0) {
+                console.error("❌ שגיאה: הכנסת חיישן נכשלה, ID לא נוצר");
+                return res.status(500).json({ message: "❌ שגיאה ביצירת חיישן חדש" });
+            }
+
+            sensorResult = [{ id: insertResult.insertId }];
+        }
+
+        const sensorId = sensorResult[0].id;
+
+        // מציאת עץ מתאים או יצירת אחד חדש
+        let treeId;
+        let [treeResult] = await db.execute(`SELECT id FROM threes ORDER BY id DESC LIMIT 1`);
+
+        if (treeResult.length === 0) {
+            console.log("🌳 לא נמצא עץ קיים, יוצר עץ חדש...");
+            let [newTree] = await db.execute(`INSERT INTO threes (id_plants, date) VALUES (?, NOW())`, [1]);
+            treeId = newTree.insertId;
+        } else {
+            treeId = treeResult[0].id;
+        }
+
+        // בדיקה סופית שאין `treeId=0` או `sensorId=0`
+        if (!treeId || treeId === 0 || !sensorId || sensorId === 0) {
+            console.error(`❌ שגיאה: treeId=${treeId}, sensorId=${sensorId} - לא תקינים`);
+            return res.status(500).json({ message: '❌ שגיאה: לא ניתן למצוא או ליצור עץ/חיישן מתאים!' });
+        }
+
+        console.log(`✅ מכניסים דגימה: treeId=${treeId}, sensorId=${sensorId}, avg=${measurementValue}`);
+
+        // הכנסת הדגימה לטבלה `datasensors`
+        await db.execute(
+            `INSERT INTO datasensors (id_trees, id_sensors, avg, date) VALUES (?, ?, ?, NOW())`,
+            [treeId, sensorId, measurementValue]
+        );
+
+        res.status(201).json({ message: `✅ הדגימה של ${sensorName} נשמרה תחת עץ ${treeId} בהצלחה!` });
+
+    } catch (error) {
+        console.error('❌ שגיאה בשליחת הדגימה:', error);
+        res.status(500).json({ message: `❌ שגיאה בשרת: ${error.sqlMessage || error.message}` });
+    }
+});
+
+
+
+
+router.get('/samples', async (req, res) => {
+    try {
+        const [samples] = await db.execute(`
+            SELECT d.id, t.id AS treeId, s.name AS sensorName, d.avg, d.date 
+            FROM datasensors d
+            JOIN threes t ON d.id_trees = t.id
+            JOIN sensors s ON d.id_sensors = s.id
+            ORDER BY d.date DESC
+        `);
+
+        res.json(samples);
+    } catch (error) {
+        console.error('שגיאה בשליפת הדגימות:', error);
+        res.status(500).json({ message: 'שגיאה בשרת' });
+    }
+});
+
+
+
+
 
 module.exports = router;
-
-
-// // routes/esp.js
-// const express = require('express');
-// const router = express.Router();
-// const fs = require('fs');
-// const tree = require('../modols/treeMode'); // וודא שהמודול Tree נמצא במיקום הנכון
-// // const express = require('express');
-// // const router = express.Router();
-// // const fs = require('fs');
-// // const db = require('../modols/dataBase'); 
-
-// // מתחילים לבנות ניתוב
-// router.get('/', (req, res) => {
-//     const { temp, light, moisture } = req.query;
-
-//     console.log(req.query);
-//     console.log(light);
-//     console.log(moisture);
-
-//     res.status(200).json({ message: "Data received" }); // הגבה עם הודעה
-// });
-
-// // תחלופה לסוקט כי אין זמן לעשות את זה
-// router.get('/state', (req, res) => {
-//     let data = JSON.parse(fs.readFileSync("inside_information.json", "utf8"));
-//     data = {
-//         state: data.state,
-//         data: new Data()
-//     };
-//     res.json(data); // גישה ל-key באובייקט 
-// });
-
-// // // קבלת מצב מהשרת
-// // router.get('/state', (req, res) => {
-// //     try {
-// //         let data = JSON.parse(fs.readFileSync("inside_information.json", "utf8"));
-// //         res.json({ state: data.state });
-// //     } catch (error) {
-// //         console.error("Error reading state:", error);
-// //         res.status(500).json({ message: "Failed to retrieve state" });
-// //     }
-// // });
-
-// //של גל 
-
-
-// // קבלת נתוני מצב ספציפיים
-// router.get('/dataMode', (req, res) => {
-//     try {
-//         const { state } = req.query;
-//         let data = JSON.parse(fs.readFileSync("inside_information.json", "utf8"));
-//         res.json(data[state] || {});
-//     } catch (error) {
-//         console.error("Error fetching mode data:", error);
-//         res.status(500).json({ message: "Failed to retrieve mode data" });
-//     }
-// });
-
-// // נתיב שמקבל את הנתונים מ-ESP
-// router.get("/esp", async (req, res) => {
-//     const { temp, light, moisture } = req.query;
-//     console.log(`Temp: ${temp}, Light: ${light}, Moisture: ${moisture}`);
-    
-//     try {
-//         // שליחה למסד הנתונים
-//         await tree.storeESPData(temp, light, moisture);  
-//         res.status(200).json({ message: "ESP data stored successfully" });
-//     } catch (error) {
-//         console.log(error);
-//         res.status(500).json({ message: "Error storing ESP data" });
-//     }
-// });
-// //ה-ESP יקרא לנתיב זה כל 10 דקות כדי לקבל את המצב הנוכחי.
-// router.get('/checkStatus', async (req, res) => {
-//     try {
-//         let data = JSON.parse(fs.readFileSync("inside_information.json", "utf8"));
-//         res.json({ status: data.state });
-//     } catch (error) {
-//         console.error("Error reading state:", error);
-//         res.status(500).json({ error: "Failed to retrieve state" });
-//     }
-// });
-// // ה-ESP ישלח לנתיב זה נתונים כל 3 שעות.
-// router.post('/sendData', async (req, res) => {
-//     try {
-//         const { sensorName, plantNumber, value } = req.body;
-        
-//         if (!sensorName || !plantNumber || !value) {
-//             return res.status(400).json({ error: "Missing parameters" });
-//         }
-
-//         // שמירת הנתונים במסד הנתונים
-//         const query = `INSERT INTO sensor_data (sensor_name, plant_number, value, timestamp) VALUES (?, ?, ?, NOW())`;
-//         await db.execute(query, [sensorName, plantNumber, value]);
-
-//         res.json({ message: "Data received successfully" });
-//     } catch (error) {
-//         console.error("Error storing sensor data:", error);
-//         res.status(500).json({ error: "Failed to store data" });
-//     }
-// });
-
-
-// let pumpState = false; // משתנה לזכירת מצב המשאבה
-
-// // קבלת נתוני החיישנים
-// router.get('/getSensors', (req, res) => {
-//     try {
-//         let data = JSON.parse(fs.readFileSync("inside_information.json", "utf8"));
-//         res.json({
-//             temp: data.TEMP_MODE.temp || 0,
-//             moisture: data.SOIL_MOISTURE_MODE.moisture || 0,
-//             light: data.LIGHT_MODE.light || 0,
-//             pump: false  // ניתן לשנות לפי הצורך
-//         });
-//     } catch (error) {
-//         console.error("❌ שגיאה בקבלת נתוני החיישנים:", error);
-//         res.status(500).json({ error: "שגיאה בשליפת נתונים מהשרת" });
-//     }
-// });
-
-
-// // הפעלת וכיבוי המשאבה
-// router.post('/togglePump', (req, res) => {
-//     pumpState = !pumpState;
-//     console.log(`🚰 מצב המשאבה שונה ל: ${pumpState ? "פועל" : "כבוי"}`);
-//     res.json({ pump: pumpState });
-// });
-
-
-
-
-
-
-
-// module.exports = router;
-
-
 
