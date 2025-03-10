@@ -4,44 +4,62 @@ class Tree {
         this.DB = db;
     }
 
-    // פונקציה שמאחסנת את נתוני ה-ESP במסד הנתונים
-    async storeESPData(temp, light, moisture) {
-        await this.DB.execute(
-            `INSERT INTO esp_data (temperature, light, moisture, timestamp) VALUES (?, ?, ?, ?)`,
-            [temp, light, moisture, new Date()]  // שליחה למסד הנתונים
-        );
+    // ✅ יצירת צמח חדש
+    async createPlant(name) {
+        await this.DB.execute(`INSERT INTO Plants (name) VALUES (?)`, [name]);
     }
 
-    // פעולות אחרות שקשורות לעצים...
-    async getAllTree() {
-        let [sql, l] = await this.DB.execute(`SELECT id FROM threes, plants WHERE id_plants = id`);
+    // ✅ יצירת עץ חדש המקושר לצמח
+    async createTree(idPlant) {
+        await this.DB.execute(`INSERT INTO Threes (id_plants) VALUES (?)`, [idPlant]);
     }
 
-    async createTree(nameTree) {
-        let [sql, l] = await this.DB.execute(`SELECT id FROM plants WHERE name = ?`, [nameTree]);
-        if (sql.length > 0) {
-            await this.DB.execute(`INSERT INTO threes(id_plants, data) VALUES(?, ?)`, [sql[0].id, new Date()]);
-        } else {
-            sql = await this.DB.execute(`INSERT INTO plants(name) VALUES(?)`, [nameTree]);
-            await this.DB.execute(`INSERT INTO threes(id_plants, data) VALUES(?, ?)`, [sql.insertId, new Date()]);
-        }
+    // ✅ עדכון שם צמח לפי ID
+    async updatePlant(id, newName) {
+        await this.DB.execute(`UPDATE Plants SET name = ? WHERE ID = ?`, [newName, id]);
     }
 
-    async checkTreeExists(nameTree) {
-        const [result] = await this.DB.execute(`SELECT id FROM plants WHERE name = ?`, [nameTree]);
-        return result.length > 0;
-    }
-
-    async updateTree(id, name) {
-        const [result] = await this.DB.execute(`UPDATE plants SET name = ? WHERE id = ?`, [name, id]);
-    }
-
+    // ✅ מחיקת עץ לפי ID (כולל זמני השקיה וחיישנים)
     async deleteTree(id) {
-        const [result] = await this.DB.execute(`DELETE FROM threes WHERE id_plants = ?`, [id]);
+        await this.DB.execute(`DELETE FROM DataSensors WHERE id_threes = ?`, [id]); // מוחק מידע מחיישנים
+        await this.DB.execute(`DELETE FROM Threes WHERE id = ?`, [id]); // מוחק את העץ
+    }
+
+    // ✅ שליפת כל העצים והצמחים המקושרים
+    async getAllTrees() {
+        let [rows] = await this.DB.execute(`
+            SELECT t.id, p.name, t.date 
+            FROM Threes t 
+            JOIN Plants p ON t.id_plants = p.ID
+        `);
+        return rows;
+    }
+
+    // ✅ הוספת נתוני חיישן לעץ מסוים
+    async addSensorData(idTree, nameSensor, avg, isRunning) {
+        await this.DB.execute(`
+            INSERT INTO DataSensors (id_threes, name_sensor, avg, isRunning) 
+            VALUES (?, ?, ?, ?)
+        `, [idTree, nameSensor, avg, isRunning]);
+    }
+
+    // ✅ שליפת כל נתוני החיישנים לעץ מסוים
+    async getSensorData(idTree) {
+        let [rows] = await this.DB.execute(`
+            SELECT name_sensor, avg, date, isRunning 
+            FROM DataSensors 
+            WHERE id_threes = ?
+        `, [idTree]);
+        return rows;
+    }
+
+    // ✅ מחיקת נתוני חיישן
+    async deleteSensorData(id) {
+        await this.DB.execute(`DELETE FROM DataSensors WHERE id = ?`, [id]);
     }
 }
 
-
+module.exports = Tree;
 
 
 

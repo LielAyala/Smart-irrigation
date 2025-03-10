@@ -3,6 +3,8 @@
 #include <NTPClient.h>
 #include <WiFiUdp.h>  // ספרייה לתקשורת UDP
 
+int GetState();
+String getJsonData(String state);
 
 // **הגדרת חיישנים ופינים**
 #define dhtPIN 16  // חיישן טמפרטורה מחובר לפין 16
@@ -42,6 +44,10 @@ unsigned long activationTime;   // משתנה לשמירת זמן הפעלה א�
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP, "pool.ntp.org", 7200, 60000);  // שעון ישראל (UTC+2)
 
+unsigned long lastSampleTime = 0;
+const long sampleInterval =0;
+// 3 * 60 * 60 * 1000;  // 3 שעות
+
 
 void setup() {
   pinMode(pumpPin, OUTPUT);
@@ -73,8 +79,18 @@ void loop() {
   Serial.println(currentStatus);
   Serial.println("");
 
+  if (millis() - lastSampleTime >= sampleInterval) {
+        lastSampleTime = millis();
+        
+        sendSample("Temperature", temp);
+        sendSample("Light", light);
+        sendSample("SoilMoisture", soilMoisture);
+    }
 
-  SendData(temp, light, soilMoisture);
+    delay(2000);
+
+
+  //SendData(temp, light, soilMoisture);
 
 
   timeClient.update();
@@ -129,7 +145,7 @@ void loop() {
           }
         }
       }
-    break;
+      break;
     case SOIL_MOISTURE_MODE:
       {
         Serial.println("נכנס למצב SOIL_MOISTURE_MODE ");
@@ -158,7 +174,7 @@ void loop() {
           }
         }
       }
-    break;
+      break;
     case SATURDAY_MODE:
       {
         Serial.println("🕍 נכנס למצב SATURDAY_MODE ");
@@ -198,25 +214,25 @@ void loop() {
           }
         }
       }
-    break;
+      break;
     case MANUAL_MODE:
-       {
-            Serial.println("MANUAL_MODE נכנסים למצב ידני  ");
-            // בדיקה אם צריך למשוך נתונים מהשרת (כל 2 דקות)
-            if ((millis() - dataPullTime) > (0 * minutes)) {
-              deserializeJson(doc, getJsonData("MANUAL_MODE"));
-              bool start = doc["enabled"];
-              if (!start) {
-                digitalWrite(pumpPin, HIGH);  // כיבוי המשאבה
-                Serial.println("🚱 המשאבה כבויה");
-              } else {
-                Serial.println("⏳ המתנה של 3 שניות לפני הפעלת המשאבה...");
-                delay(3000);                 // **עיכוב של 3 שניות לפני ההפעלה**
-                digitalWrite(pumpPin, LOW);  // הפעלת המשאבה
-                Serial.println("🚰 המשאבה הופעלה!");
-              }
-            }
+      {
+        Serial.println("MANUAL_MODE נכנסים למצב ידני  ");
+        // בדיקה אם צריך למשוך נתונים מהשרת (כל 2 דקות)
+        if ((millis() - dataPullTime) > (0 * minutes)) {
+          deserializeJson(doc, getJsonData("MANUAL_MODE"));
+          bool start = doc["enabled"];
+          if (!start) {
+            digitalWrite(pumpPin, HIGH);  // כיבוי המשאבה
+            Serial.println("🚱 המשאבה כבויה");
+          } else {
+            Serial.println("⏳ המתנה של 3 שניות לפני הפעלת המשאבה...");
+            delay(3000);                 // **עיכוב של 3 שניות לפני ההפעלה**
+            digitalWrite(pumpPin, LOW);  // הפעלת המשאבה
+            Serial.println("🚰 המשאבה הופעלה!");
+          }
         }
-    break;
-    }
+      }
+      break;
   }
+}
