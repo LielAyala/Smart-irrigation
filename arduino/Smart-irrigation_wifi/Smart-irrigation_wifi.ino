@@ -1,168 +1,241 @@
-#include <DHT.h> // ספרייה לניהול חיישני טמפרטורה ולחות
-#include <ArduinoJson.h> // ספרייה לעבודה עם JSON (פרסור והמרת נתונים)
+#include <DHT.h>
+#include <ArduinoJson.h>
+#include <NTPClient.h>
+#include <WiFiUdp.h>  // ספרייה לתקשורת UDP
 
-// הגדרת חיישן טמפרטורה ---------------------------------------------
-#define dhtPIN 16 // הפין שאליו מחובר חיישן הטמפרטורה
-#define DHTTYPE DHT11 // סוג החיישן DHT11
+int GetState();
+String getJsonData(String state);
 
-DHT dht(dhtPIN, DHTTYPE); // יצירת אובייקט חיישן DHT לקריאה מהחיישן
+// **הגדרת חיישנים ופינים**
+#define dhtPIN 16  // חיישן טמפרטורה מחובר לפין 16
+#define DHTTYPE DHT11
+DHT dht(dhtPIN, DHTTYPE);
 
-// הגדרת חיישני אור ולחות קרקע --------------------------------------
-#define lightSensor 32 // הפין שאליו מחובר חיישן האור
-#define Soil_moisture_Sensor 35 // הפין שאליו מחובר חיישן לחות הקרקע
+#define lightSensor 32         // חיישן אור מחובר לפין 32
+#define soilMoistureSensor 35  // חיישן לחות קרקע מחובר לפין 35
 
-// הגדרת פינים לשליטה במשאבה ----------------------------------------
-#define B1a 19 // פין שליטה במשאבה
-#define B1b 18 // פין שליטה במשאבה
+#define pumpPin 19  // פין להפעלת המשאבה
 
-// משתנים גלובליים ---------------------------------------------------
-DynamicJsonDocument doc(1024); // משתנה לאחסון נתוני JSON בגודל 1024 בתים
-int desiredMoisture = 50; // ערך ברירת מחדל של לחות קרקע
 
-// הגדרת מצבי מערכת (State Machine) ----------------------------------
-#define TEMP_MODE 61 // מצב מדידת טמפרטורה
-#define SOIL_MOISTURE_MODE 62 // מצב מדידת לחות קרקע
-#define SATURDAY_MODE 63 // מצב הפעלה בשבת
-#define MANUAL_MODE 64 // מצב ידני
+// **מצבי מערכת - ערכים מספריים קבועים לכל מצב**
+#define TEMP_MODE 61
+#define SOIL_MOISTURE_MODE 62
+#define SATURDAY_MODE 63
+#define MANUAL_MODE 64
 
-int CurrentStatus; // משתנה שמחזיק את מצב המערכת הנוכחי
-unsigned long statusCheckTime; // משתנה לשמירת הזמן האחרון לבדיקה
-unsigned long DataPullTime; // משתנה לשמירת זמן עדכון נתונים
-unsigned long activationTime; // משתנה לשמירת זמן ההפעלה האחרון
-unsigned long lastTimeOn; // משתנה לשמירת הזמן האחרון שהמשאבה הופעלה
+// **משתנים גלובליים**
+DynamicJsonDocument doc(1024);  // משתנה לטיפול בנתוני JSON
 
-float CurrentTemp; // משתנה לטמפרטורה נוכחית
-int light; // משתנה לעוצמת אור
-int minutes = (1000 * 60); // חישוב של דקה במילישניות
-float temp; // משתנה לערך טמפרטורה
-int minT, maxT; // משתנים לטווחי זמן הפעלה
-bool isPumpON; // משתנה לבדיקת מצב המשאבה
-int countON = 0; // מונה הפעלות משאבה
+const int minutes = 60000;  // הגדרת דקה במילישניות (1000ms * 60s)
+
+float currentTemp;      // משתנה לאחסון טמפרטורה נוכחית
+int light;              // משתנה לאחסון ערך חיישן האור
+int soilMoisture;       // משתנה לאחסון ערך חיישן הלחות בקרקע
+int minT, maxT;         // זמני הפעלה מוגדרים מראש
+bool isPumpON = false;  // משתנה לבדיקה אם המשאבה פועלת
+int countON = 0;
+
+// **State Machine**
+int currentStatus;              // משתנה שיחזיק את המצב הנוכחי של המערכת
+unsigned long statusCheckTime;  // משתנה לניהול תזמון בדיקת מצב
+unsigned long dataPullTime;     // משתנה לניהול תזמון שליחת נתונים לשרת
+unsigned long activationTime;   // משתנה לשמירת זמן הפעלה אחרון
+
+// // שרתי NTP לקבלת זמן
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "pool.ntp.org", 7200, 60000);  // שעון ישראל (UTC+2)
+
+unsigned long lastSampleTime = 0;
+const long sampleInterval =0;
+// 3 * 60 * 60 * 1000;  // 3 שעות
+
 
 void setup() {
-  dht.begin(); // הפעלת חיישן הטמפרטורה
-  Serial.begin(115200); // הפעלת תקשורת סריאלית עם מהירות 115200
-  WiFi_Setup(); // אתחול חיבור ה-WiFi
-
-  dcMotorSetup(); // הגדרת מצב עבודה של הפינים לשליטה במשאבה
-  delay(100); // השהיה של 100 מילישניות
-
-  isPumpON = true; // הגדרת המשאבה כפעילה
-  statusCheckTime = millis(); // שמירת הזמן הנוכחי לבדיקה עתידית
+  pinMode(pumpPin, OUTPUT);
+  Serial.begin(115200);
+  WiFi_Setup();
+  dht.begin();
+  isPumpON = false;
+  statusCheckTime = millis();
+  digitalWrite(pumpPin, HIGH);  // כיבוי המשאבה
+  // הפעלת ה-NTP
+  timeClient.begin();
 }
 
 void loop() {
-  float t = dht.readTemperature(); // קריאת טמפרטורה מהחיישן
-  int light = analogRead(lightSensor); // קריאת עוצמת אור מהחיישן
-  int soilMoisture = analogRead(Soil_moisture_Sensor); // קריאת לחות הקרקע מהחיישן
+  light = map(analogRead(lightSensor), 0, 4095, 0, 100);
+  float temp = dht.readTemperature();
+  soilMoisture = map(analogRead(soilMoistureSensor), 0, 4095, 0, 100);
 
-  sendData(t, light, soilMoisture); // שליחת הנתונים
+  digitalWrite(pumpPin, HIGH);  // כיבוי המשאבה
 
-  delay(2000); // השהיה של 2 שניות בין קריאות
+  Serial.print("light = ");
+  Serial.println(light);
 
-  if (millis() - statusCheckTime > (10 * minutes)) { // בדיקה אם עברו 10 דקות מאז הבדיקה האחרונה
-    CurrentStatus = GetState(); // קביעת מצב המערכת הנוכחי
-    statusCheckTime = millis(); // עדכון זמן הבדיקה האחרון
+  Serial.print("temp = ");
+  Serial.println(temp);
+
+  Serial.print("Moisture = ");
+  Serial.println(soilMoisture);
+  Serial.println("");
+  delay(2000);
+  Serial.println(currentStatus);
+  Serial.println("");
+  delay(2000);
+
+  if (millis() - lastSampleTime >= sampleInterval) {
+        lastSampleTime = millis();   
+        sendSample("Temperature", temp);
+        sendSample("Light", light);
+        sendSample("SoilMoisture", soilMoisture);
+    }
+    delay(2000);
+
+
+  //SendData(temp, light, soilMoisture);
+
+
+  timeClient.update();
+  Serial.print("השעה עכשיו: ");
+  Serial.print(timeClient.getHours());
+  Serial.print(":");
+  Serial.print(timeClient.getMinutes());
+  Serial.print(":");
+  Serial.println(timeClient.getSeconds());
+  delay(2000);
+
+
+  if (millis() - statusCheckTime > (0 * minutes)) {
+    currentStatus = GetState();
+    statusCheckTime = millis();
   }
 
-  // מעבר בין המצבים השונים של המערכת
-  switch (CurrentStatus) {
-    case TEMP_MODE: { // מצב מדידת טמפרטורה
-    Serial.print(TEMP_MODE);
-      CurrentTemp = dht.readTemperature(); // קריאת טמפרטורה נוכחית
-      light = map(analogRead(lightSensor), 0, 4095, 0, 100); // המרת קריאת האור לטווח 0-100
+  switch (currentStatus) {
+    case TEMP_MODE:
+      {
+        Serial.println("נכנס למצב TEMP_MODE ");
+        currentTemp = dht.readTemperature();
+        light = map(analogRead(lightSensor), 0, 4095, 0, 100);
 
-      if ((millis() - DataPullTime) > (2 * minutes)) { // בדיקה אם עברו 2 דקות מאז עדכון הנתונים האחרון
-        deserializeJson(doc, getJsonData("tempMode")); // קבלת נתוני JSON מהשרת
-        temp = (float) doc["temp"]; // שליפת ערך הטמפרטורה מה-JSON
-        minT = doc["minTime"].as<int>() * minutes; // שליפת זמן מינימלי
-        maxT = doc["maxTime"].as<int>() * minutes; // שליפת זמן מקסימלי
-        activationTime = doc["duration"].as<int>() * minutes; // שגיאה: המשתנה activationDuration לא הוגדר
+        if ((millis() - dataPullTime) > (2 * minutes)) {
+          deserializeJson(doc, getJsonData("tempMode"));
+          temp = (float)doc["temp"];
+          minT = doc["minTime"];
+          maxT = doc["maxTime"];
+          dataPullTime = millis();
+        }
 
-        DataPullTime = millis(); // עדכון זמן משיכת הנתונים האחרון
-      }
+        if (light > 90) {
+          isPumpON = true;
+        } else if (light < 10 && countON == 2) {
+          isPumpON = true;
+          countON = 0;
+        }
 
-      if (CurrentTemp > temp) { // אם הטמפרטורה גבוהה מהערך הרצוי
-        setOn(); // הפעלת המשאבה
-        delay(maxT); // השהיית הפעלה לפי זמן מקסימלי
-        Off(); // כיבוי המשאבה
-      } else {
-        setOn(); // הפעלת המשאבה
-        delay(minT); // השהיית הפעלה לפי זמן מינימלי
-        Off(); // כיבוי המשאבה
-      }
-      break;
-    }
-
-    case SOIL_MOISTURE_MODE: { // מצב מדידת לחות קרקע
-    Serial.print(SOIL_MOISTURE_MODE);
-      if ((millis() - DataPullTime) > (2 * minutes)) { // בדיקה אם עברו 2 דקות מאז עדכון הנתונים האחרון
-        deserializeJson(doc, getJsonData("soilMoistureMode")); // קבלת נתוני JSON מהשרת
-        int desiredMoisture = doc["moisture"]; // שליפת ערך הלחות הרצוי
-        DataPullTime = millis(); // עדכון זמן משיכת הנתונים האחרון
-      }
-
-      if (soilMoisture < desiredMoisture - 10) { // אם הלחות מתחת לטווח הרצוי
-        setOn(); // הפעלת המשאבה
-      } else if (soilMoisture > desiredMoisture + 10) { // אם הלחות מעל הטווח הרצוי
-        Off(); // כיבוי המשאבה
+        if (isPumpON && temp < currentTemp && countON < 2 && light < 40) {
+          digitalWrite(pumpPin, LOW);
+          if (millis() - activationTime > (maxT * minutes)) {
+            digitalWrite(pumpPin, HIGH);
+            isPumpON = false;
+            countON++;
+            activationTime = millis();
+          }
+        } else if (isPumpON && countON < 2) {
+          digitalWrite(pumpPin, LOW);
+          if (millis() - activationTime > (minT * minutes)) {
+            digitalWrite(pumpPin, HIGH);
+            isPumpON = false;
+            countON++;
+            activationTime = millis();
+          }
+        }
       }
       break;
-    }
+    case SOIL_MOISTURE_MODE:
+      {
+        Serial.println("נכנס למצב SOIL_MOISTURE_MODE ");
+        soilMoisture = map(analogRead(soilMoistureSensor), 0, 4095, 0, 100);
+        int maxMoist = max(soilMoisture, 40);
+        int minMoist = min(soilMoisture, 20);
 
-    case SATURDAY_MODE: { // מצב שבת
-    Serial.print(SATURDAY_MODE);
-      deserializeJson(doc, getJsonData("saturdayMode")); // קבלת נתוני JSON מהשרת
-      int activationHour = doc["hour"]; // שליפת שעה להפעלה
-      int activationDuration = doc["duration"].as<int>() * minutes; // שגיאה: אין התאמה בין טיפוסים
+        if ((millis() - dataPullTime) > (2 * minutes)) {
+          deserializeJson(doc, getJsonData("MoistureMode"));
+          soilMoisture = (int)doc["moisture"];
+          minT = doc["minTime"];
+          maxT = doc["maxTime"];
+          dataPullTime = millis();
+        }
 
-      if (shouldActivate(activationHour)) { // בדיקה אם צריך להפעיל את המערכת לפי שעה
-        setOn(); // הפעלת המשאבה
-        delay(activationDuration); // השהיית הפעלה לפי זמן מה-JSON
-        Off(); // כיבוי המשאבה
+        if (soilMoisture > minMoist || soilMoisture < minMoist) {
+          isPumpON = true;
+        }
+
+        if (isPumpON) {
+          digitalWrite(pumpPin, LOW);
+          if (millis() - activationTime > (maxT * minutes)) {
+            digitalWrite(pumpPin, HIGH);
+            isPumpON = false;
+            activationTime = millis();
+          }
+        }
       }
       break;
-    }
+    case SATURDAY_MODE:
+      {
+        Serial.println(" נכנס למצב SATURDAY_MODE ");
 
-    case MANUAL_MODE: { // מצב ידני
-    Serial.print(MANUAL_MODE);
-      deserializeJson(doc, getJsonData("manualMode")); // קבלת נתוני JSON מהשרת
-      bool activatePump = doc["activate"]; // שליפת ערך הפעלת המשאבה
-      delay(3000); // השהיה של 3 שניות
+        // עדכון השעה הנוכחית מ-NTP
+        timeClient.update();
+        int currentHour = timeClient.getHours();
+        int currentMinute = timeClient.getMinutes();
 
-      if (activatePump) { // אם ההפעלה הידנית נדרשת
-        setOn(); // הפעלת המשאבה
-      } else {
-        Off(); // כיבוי המשאבה
+        // בדיקה אם צריך למשוך נתונים מהשרת (כל 0 דקות)
+        if ((millis() - dataPullTime) > (0 * minutes)) {
+          deserializeJson(doc, getJsonData("SATURDAY_MODE"));
+
+          int scheduledHour = doc["hour"];      // שעה להפעלת המשאבה
+          int scheduledMinute = doc["minute"];  // דקה להפעלת המשאבה
+          int duration = doc["duration"];       // משך הפעלת המשאבה בדקות
+
+          // שמירה של הנתונים כדי להשתמש בהם במעבר הבא בלולאה
+          dataPullTime = millis();
+          activationTime = duration * minutes;
+
+          Serial.print(" שעה מתוזמנת להפעלה: ");
+          Serial.print(scheduledHour);
+          Serial.print(":");
+          Serial.println(scheduledMinute);
+
+          // שמירת הנתונים למשך ההשוואה עם הזמן הנוכחי
+          if (currentHour == scheduledHour && currentMinute == scheduledMinute) {
+            Serial.println(" מפעיל משאבה במצב שבת");
+            digitalWrite(pumpPin, LOW);  // הפעלת המשאבה
+            // המתנה לפי הזמן שהוגדר ואז כיבוי המשאבה
+            delay(activationTime);
+            digitalWrite(pumpPin, HIGH);  // כיבוי המשאבה
+            Serial.println(" המשאבה כובתה לאחר הזמן שהוגדר");
+          }
+        }
       }
       break;
-    }
+    case MANUAL_MODE:
+      {
+        Serial.println("MANUAL_MODE נכנסים למצב ידני  ");
+        // בדיקה אם צריך למשוך נתונים מהשרת (כל 2 דקות)
+        if ((millis() - dataPullTime) > (0 * minutes)) {
+          deserializeJson(doc, getJsonData("MANUAL_MODE"));
+          bool start = doc["enabled"];
+          if (!start) {
+            digitalWrite(pumpPin, HIGH);  // כיבוי המשאבה
+            Serial.println(" המשאבה כבויה");
+          } else {
+            Serial.println(" המתנה של 3 שניות לפני הפעלת המשאבה...");
+            delay(3000);                 // **עיכוב של 3 שניות לפני ההפעלה**
+            digitalWrite(pumpPin, LOW);  // הפעלת המשאבה
+            Serial.println(" המשאבה הופעלה!");
+          }
+        }
+      }
+      break;
   }
-}
-
-// פונקציה לבדיקה אם יש להפעיל את המערכת לפי שעה
-bool shouldActivate(int hour) {
-  struct tm timeinfo;
-  if (!getLocalTime(&timeinfo)) { // אם לא ניתן לקבל את הזמן המקומי
-    return false;
-  }
-  return (timeinfo.tm_hour == hour); // החזרת אמת אם השעה תואמת לשעת ההפעלה
-}
-
-// פונקציה לאתחול פינים של מנוע
-void dcMotorSetup() {
-    pinMode(B1a, OUTPUT);
-    pinMode(B1b, OUTPUT);
-}
-
-// הפעלת המשאבה
-void setOn() {
-	  digitalWrite(B1a, LOW);
-	  digitalWrite(B1b, HIGH);
-}
-
-// כיבוי המשאבה
-void Off() {
-    digitalWrite(B1a, HIGH);
-    digitalWrite(B1b, HIGH);
 }

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מערכת חיישנים - ESP32</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f4f4f4;
+        }
+        h1 {
+            color: #333;
+        }
+        .container {
+            width: 60%;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0px 0px 10px gray;
+        }
+        .sensor-data {
+            font-size: 20px;
+            margin: 10px 0;
+        }
+        .btn {
+            padding: 10px 20px;
+            font-size: 18px;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .on {
+            background-color: green;
+        }
+        .off {
+            background-color: red;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>נתוני חיישנים - מערכת השקיה חכמה</h1>
+    <div class="container">
+        <p class="sensor-data">🌡️ טמפרטורה: <span id="temperature">--</span>°C</p>
+        <p class="sensor-data">💧 לחות קרקע: <span id="moisture">--</span>%</p>
+        <p class="sensor-data">🔆 עוצמת אור: <span id="light">--</span>%</p>
+        <p class="sensor-data">🚰 מצב המשאבה: <span id="pumpStatus">--</span></p>
+        
+        <button id="pumpBtn" class="btn off" onclick="togglePump()">🚱 הפעל משאבה</button>
+    </div>
+
+    <script>
+        const apiUrl = "http://192.168.1.160:3011/esp";  // כתובת השרת
+
+        // שליפת נתוני החיישנים מהשרת כל 5 שניות
+        function fetchSensorData() {
+            fetch(apiUrl + "/getSensors")
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById("temperature").innerText = data.temp;
+                    document.getElementById("moisture").innerText = data.moisture;
+                    document.getElementById("light").innerText = data.light;
+                    document.getElementById("pumpStatus").innerText = data.pump ? "פועל ✅" : "כבוי ❌";
+                    
+                    // עדכון צבע הכפתור לפי מצב המשאבה
+                    let btn = document.getElementById("pumpBtn");
+                    if (data.pump) {
+                        btn.classList.remove("off");
+                        btn.classList.add("on");
+                        btn.innerText = "🚰 כבה משאבה";
+                    } else {
+                        btn.classList.remove("on");
+                        btn.classList.add("off");
+                        btn.innerText = "🚱 הפעל משאבה";
+                    }
+                })
+                .catch(error => console.error("שגיאה בקבלת הנתונים:", error));
+        }
+
+        // הפעלת/כיבוי המשאבה
+        function togglePump() {
+            fetch(apiUrl + "/togglePump", { method: "POST" })
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById("pumpStatus").innerText = data.pump ? "פועל ✅" : "כבוי ❌";
+                    let btn = document.getElementById("pumpBtn");
+                    if (data.pump) {
+                        btn.classList.remove("off");
+                        btn.classList.add("on");
+                        btn.innerText = "🚰 כבה משאבה";
+                    } else {
+                        btn.classList.remove("on");
+                        btn.classList.add("off");
+                        btn.innerText = "🚱 הפעל משאבה";
+                    }
+                })
+                .catch(error => console.error("שגיאה בשליחת הפקודה:", error));
+        }
+
+        // טעינת הנתונים בהתחלה ועדכון כל 5 שניות
+        fetchSensorData();
+        setInterval(fetchSensorData, 5000);
+    </script>
+
+</body>
+</html>
