@@ -5,7 +5,7 @@ const morgan = require('morgan');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const bodyParser = require('body-parser');
-const path = require('path'); // ✅ תיקון השגיאה - הוספת המודול path
+const path = require('path'); // 
 
 dotenv.config(); // טעינת משתני סביבה
 
@@ -37,5 +37,5 @@ app.get('/', (req, res) => {
 });
 
 app.listen(port, () => {
-    console.log(`✅ Server is running at http://localhost:${port}`);
+    console.log(`Server is running at http://localhost:${port}`);
 });

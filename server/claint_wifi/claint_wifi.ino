@@ -92,17 +92,17 @@ int getStatusFromServer() {
   int ret = -1;     // משתנה להחזרת המצב מהשרת
   // כתובת ה-URL שמחזירה את המצב הנוכחי
   String url = "http://192.168.1.160:3011/esp/dataMode";
-  Serial.print("🔹 שולח בקשת GET לכתובת: ");
+  Serial.print(" שולח בקשת GET לכתובת: ");
   Serial.println(url);
   http.begin(url);            // פתיחת החיבור לשרת
   int httpCode = http.GET();  // שליחת בקשת GET
   // בדיקה אם השרת החזיר תשובה תקינה (200 OK)
   if (httpCode == HTTP_CODE_OK) {
-    Serial.print("✅ קיבלתי תשובה מהשרת, קוד: ");
+    Serial.print("קיבלתי תשובה מהשרת, קוד: ");
     Serial.println(httpCode);
 
     String response = http.getString();  // קריאת התגובה מהשרת
-    Serial.print("📌 תוכן התשובה: ");
+    Serial.print(" תוכן התשובה: ");
     Serial.println(response);
     // חיפוש הערך `currentState` בתגובה מהשרת
     int index = response.indexOf("currentState");
@@ -112,7 +112,7 @@ int getStatusFromServer() {
       ret = response.toInt();                                   // ממיר למספר
     }
   } else {
-    Serial.print("❌ שגיאה בחיבור לשרת, קוד: ");
+    Serial.print(" שגיאה בחיבור לשרת, קוד: ");
     Serial.println(httpCode);
   }
   http.end();  // סגירת החיבור
@@ -157,14 +157,14 @@ String getJsonData(String state) {
   int httpCode = http.GET();  // שליחת בקשת GET
 
   if (httpCode == HTTP_CODE_OK) {
-    Serial.print("✅ קיבלתי תשובה מהשרת, קוד: ");
+    Serial.print(" קיבלתי תשובה מהשרת, קוד: ");
     Serial.println(httpCode);
 
     Json = http.getString();  // שמירת הנתונים שהתקבלו
-    Serial.print("📌 תוכן התשובה: ");
+    Serial.print(" תוכן התשובה: ");
     Serial.println(Json);
   } else {
-    Serial.print("❌ שגיאה בחיבור לשרת, קוד: ");
+    Serial.print(" שגיאה בחיבור לשרת, קוד: ");
     Serial.println(httpCode);
   }
 

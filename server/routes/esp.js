@@ -75,7 +75,7 @@ router.get('/dataMode', (req, res) => {
 
         res.json(data[state]); // מחזיר את הנתונים של המצב המבוקש
     } catch (error) {
-        console.error("❌ שגיאה בקריאת המידע:", error);
+        console.error(" שגיאה בקריאת המידע:", error);
         res.status(500).json({ error: "Failed to retrieve data" });
     }
 });
@@ -150,7 +150,7 @@ const convertValuesToNumbers = (obj) => {
 // נתיב לעדכון inside_information.json
 router.post('/updateInsideInformation', (req, res) => {
     try {
-        console.log("📌 קיבלנו נתונים מהלקוח:", req.body);
+        console.log(" קיבלנו נתונים מהלקוח:", req.body);
 
         let data = JSON.parse(fs.readFileSync("inside_information.json", "utf8"));
         let { state, updatedData } = req.body;
@@ -159,11 +159,11 @@ router.post('/updateInsideInformation', (req, res) => {
         let mappedState = stateMapping[state] || state;
 
         if (!mappedState || !updatedData) {
-            return res.status(400).json({ error: "❌ חסר state או updatedData בגוף הבקשה" });
+            return res.status(400).json({ error: " חסר state או updatedData בגוף הבקשה" });
         }
 
         if (!data[mappedState]) {
-            return res.status(400).json({ error: `❌ מצב ${mappedState} אינו קיים בקובץ JSON` });
+            return res.status(400).json({ error: ` מצב ${mappedState} אינו קיים בקובץ JSON` });
         }
 
         // המרת מחרוזות למספרים לפני שמירה
@@ -173,10 +173,10 @@ router.post('/updateInsideInformation', (req, res) => {
         data[mappedState] = { ...data[mappedState], ...convertedData };
         fs.writeFileSync("inside_information.json", JSON.stringify(data, null, 2), "utf8");
 
-        console.log("✅ עדכון הושלם בהצלחה!", data[mappedState]);
+        console.log(" עדכון הושלם בהצלחה!", data[mappedState]);
         res.json({ message: "Updated successfully", data: data[mappedState] });
     } catch (error) {
-        console.error("❌ שגיאה בעדכון הקובץ:", error);
+        console.error(" שגיאה בעדכון הקובץ:", error);
         res.status(500).json({ error: "Failed to update data" });
     }
 });
