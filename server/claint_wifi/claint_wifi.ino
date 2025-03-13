@@ -34,38 +34,56 @@ void SendData(float temp, int light, int moisture) {
   http.end();
 }
 //פונקציה לשליחת הדגימות
-void sendSample(String sensorName, float value) {
+// פונקציה לשליחת דגימת חיישן לשרת
+// void sendSample(String sensorName, float value) {
+//     if (WiFi.status() == WL_CONNECTED) {
+//         HTTPClient http;
+//         http.begin("http://192.168.1.160:3011/esp/sendSample");
+//         http.addHeader("Content-Type", "application/json");
+
+//         // יצירת JSON תקין עם Escape לנתונים
+//         String jsonPayload = "{\"sensorName\":\"" + sensorName + "\",\"measurementValue\":" + String(value, 2) + "}";
+
+//         // הדפסת JSON לפני השליחה כדי לוודא תקינות
+//         Serial.print("📌 JSON שנשלח: ");
+//         Serial.println(jsonPayload);
+
+//         // שליחת הבקשה לשרת
+//         int httpResponseCode = http.POST(jsonPayload);
+
+//         // בדיקת תגובת השרת
+//         if (httpResponseCode > 0) {
+//             Serial.println("✅ דגימה נשלחה בהצלחה! קוד תגובה: " + String(httpResponseCode));
+//             Serial.println("📩 תגובת השרת: " + http.getString());
+//         } else {
+//             Serial.println("❌ שגיאה בשליחת הדגימה. קוד תגובה: " + String(httpResponseCode));
+//         }
+
+//         http.end();
+//     } else {
+//         Serial.println("⚠️ אין חיבור ל-WiFi! בדקו את הרשת.");
+//     }
+// }
+
+void sendWaterUsage() {
     if (WiFi.status() == WL_CONNECTED) {
         HTTPClient http;
-        http.begin("http://192.168.1.160:3011/esp/sendSample");
+        http.begin("http://192.168.1.160:3011/esp/waterUsage");
         http.addHeader("Content-Type", "application/json");
 
-        // בדיקת הנתונים שנשלחים
-        Serial.print("🚀 שולח דגימה: חיישן = ");
-        Serial.print(sensorName);
-        Serial.print(", ערך = ");
-        Serial.println(value);
-
-        // יצירת JSON עם הנתונים מהחיישן
-        String jsonPayload = "{\"sensorName\": \"" + sensorName + "\", \"treeId\": 1, \"measurementValue\": " + String(value) + "}";
+        String jsonPayload = "{\"treeID\":" + String(treeID) + ",\"waterUsageToday\":" + String(waterUsageToday) + "}";
 
         int httpResponseCode = http.POST(jsonPayload);
 
         if (httpResponseCode > 0) {
-            Serial.println("✅ דגימה נשלחה בהצלחה: " + String(httpResponseCode));
-            Serial.println(http.getString());
+            Serial.println(" נתוני מים נשלחו בהצלחה!");
         } else {
-            Serial.println("❌ שגיאה בשליחת הדגימה: " + String(httpResponseCode));
+            Serial.println("שגיאה בשליחת הנתונים.");
         }
 
         http.end();
-    } else {
-        Serial.println("⚠️ אין חיבור ל-WiFi!");
     }
 }
-
-
-
 
 
 //פונקציה שמקבלת את המצב הנוכחי מהinside_information

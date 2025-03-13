@@ -1,5 +1,5 @@
 {
-  "state": "62",
+  "state": "64",
   "TEMP_MODE": {
     "temp": 25.5,
     "minTime": 1,
@@ -16,6 +16,8 @@
     "duration": 1
   },
   "MANUAL_MODE": {
-    "enabled": false
+    "enabled": true
+
+
   }
 }

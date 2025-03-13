@@ -80,78 +80,62 @@ router.get('/dataMode', (req, res) => {
     }
 });
 // נתיב לקליטת דגימות חיישנים שנשלחות מהארדואינו
-// נתיב לקליטת דגימות חיישנים שנשלחות מהארדואינו
-router.post('/sendSample', async (req, res) => {
-    try {
-        // שליפת הנתונים מהבקשה שהתקבלה
-        const { sensorName, measurementValue } = req.body;
+// router.post('/sendSample', async (req, res) => {
+//     try {
+//         // שליפת הנתונים מהבקשה שהתקבלה
+//         const { sensorName, measurementValue } = req.body;
 
-        // הדפסת הנתונים שהתקבלו למסוף השרת לצורך מעקב
-        console.log("נתונים שהתקבלו מהארדואינו:", { sensorName, measurementValue });
+//         // הדפסת הנתונים שהתקבלו למסוף השרת לצורך מעקב
+//         console.log("נתונים שהתקבלו מהארדואינו:", { sensorName, measurementValue });
 
-        // בדיקה אם חסרים נתונים קריטיים בבקשה
-        if (!sensorName || measurementValue === undefined) {
-            return res.status(400).json({ message: 'נתונים חסרים, בדקו את השליחה מהארדואינו!' });
-        }
+//         // בדיקה אם חסרים נתונים קריטיים בבקשה
+//         if (!sensorName || measurementValue === undefined) {
+//             return res.status(400).json({ message: 'נתונים חסרים, בדקו את השליחה מהארדואינו!' });
+//         }
 
-        // בדיקה אם קיים עץ כלשהו במערכת
-        let [treeResult] = await db.execute(`SELECT id FROM threes ORDER BY id DESC LIMIT 1`);
+//         // בדיקה אם קיים עץ כלשהו במערכת
+//         let [treeResult] = await db.execute(`SELECT id FROM threes ORDER BY id DESC LIMIT 1`);
 
-        let treeId;
-        // אם אין עץ במערכת, יוצרים עץ חדש
-        if (treeResult.length === 0) {
-            console.log("לא נמצא עץ קיים – יוצרים עץ חדש...");
+//         let treeId;
+//         // אם אין עץ במערכת, יוצרים עץ חדש
+//         if (treeResult.length === 0) {
+//             console.log("לא נמצא עץ קיים – יוצרים עץ חדש...");
             
-            // הכנסת עץ חדש לטבלה `threes`
-            let [newTree] = await db.execute(`INSERT INTO threes (id_plants, date) VALUES (?, NOW())`, [1]);
+//             // הכנסת עץ חדש לטבלה `threes`
+//             let [newTree] = await db.execute(`INSERT INTO threes (id_plants, date) VALUES (?, NOW())`, [1]);
 
-            // שמירת מזהה העץ החדש שנוסף
-            treeId = newTree.insertId;
-        } else {
-            // אם נמצא עץ קיים, משתמשים בו
-            treeId = treeResult[0].id;
-        }
+//             // שמירת מזהה העץ החדש שנוסף
+//             treeId = newTree.insertId;
+//         } else {
+//             // אם נמצא עץ קיים, משתמשים בו
+//             treeId = treeResult[0].id;
+//         }
 
-        // הדפסת השיוך של הדגימה לעץ שנבחר או שנוסף
-        console.log(`משייכים את הדגימה לעץ ${treeId}`);
+//         // הדפסת השיוך של הדגימה לעץ שנבחר או שנוסף
+//         console.log(`משייכים את הדגימה לעץ ${treeId}`);
 
-        // הכנסת הדגימה לטבלת `datasensors`
-        await db.execute(
+//         // הכנסת הדגימה לטבלת `datasensors`
+//         await db.execute(
             
-            `INSERT INTO datasensors (id_threes, name_sensor, avg, date, isRunning) 
-             VALUES (?, ?, ?, NOW(), ?)`,
-            [treeId, sensorName, measurementValue, 1] // כאן הוספנו ערך ברירת מחדל ל- isRunning
-        );
+//             `INSERT INTO datasensors (id_threes, name_sensor, avg, date, isRunning) 
+//              VALUES (?, ?, ?, NOW(), ?)`,
+//             [treeId, sensorName, measurementValue, 1] // כאן הוספנו ערך ברירת מחדל ל- isRunning
+//         );
         
 
-        // החזרת תגובה שהדגימה נשמרה בהצלחה
-        res.status(201).json({ message: `הדגימה של ${sensorName} נשמרה תחת עץ ${treeId} בהצלחה!` });
+//         // החזרת תגובה שהדגימה נשמרה בהצלחה
+//         res.status(201).json({ message: `הדגימה של ${sensorName} נשמרה תחת עץ ${treeId} בהצלחה!` });
 
-    } catch (error) {
-        // הדפסת שגיאה במקרה של כשל
-        console.error('שגיאה בשליחת הדגימה:', error);
+//     } catch (error) {
+//         // הדפסת שגיאה במקרה של כשל
+//         console.error('שגיאה בשליחת הדגימה:', error);
 
-        // שליחת תגובה עם שגיאה ללקוח
-        res.status(500).json({ message: `שגיאה בשרת: ${error.sqlMessage || error.message}` });
-    }
-});
+//         // שליחת תגובה עם שגיאה ללקוח
+//         res.status(500).json({ message: `שגיאה בשרת: ${error.sqlMessage || error.message}` });
+//     }
+// });
 
-router.get('/samples', async (req, res) => {
-    try {
-        const [samples] = await db.execute(`
-            SELECT d.id, t.id AS treeId, s.name AS sensorName, d.avg, d.date 
-            FROM datasensors d
-            JOIN threes t ON d.id_trees = t.id
-            JOIN sensors s ON d.id_sensors = s.id
-            ORDER BY d.date DESC
-        `);
 
-        res.json(samples);
-    } catch (error) {
-        console.error('שגיאה בשליפת הדגימות:', error);
-        res.status(500).json({ message: 'שגיאה בשרת' });
-    }
-});
 // נתיב לעדכון נתונים בקובץ JSON
 // פונקציה להמרת ערכים למספרים אם אפשר
 const convertValuesToNumbers = (obj) => {
@@ -194,6 +178,69 @@ router.post('/updateInsideInformation', (req, res) => {
     } catch (error) {
         console.error("❌ שגיאה בעדכון הקובץ:", error);
         res.status(500).json({ error: "Failed to update data" });
+    }
+});
+//נתיב לקבלת נתוני צריכת מים מהארדואינו ושמירתם בטבלת 
+router.post('/waterUsage', async (req, res) => {
+    try {
+        let { treeID, waterUsageToday } = req.body;  
+
+        console.log("נתוני צריכת מים שהתקבלו:", { treeID, waterUsageToday });
+
+        if (!treeID || waterUsageToday === undefined) {
+            return res.status(400).json({ message: 'נתונים חסרים, בדקו את השליחה מהארדואינו!' });
+        }
+
+        // בדיקה אם האי די של העץ קיים 
+        let [treeExists] = await db.execute(`SELECT id FROM threes WHERE id = ?`, [treeID]);
+
+        if (treeExists.length === 0) {
+            console.log(` העץ עם treeID=${treeID} לא נמצא!`);
+            return res.status(404).json({ message: ` העץ עם treeID=${treeID} לא נמצא במערכת!` });
+        }
+
+        //  הכנסת נתוני המים לטבלת 
+        await db.execute(`
+            INSERT INTO datasensors (id_threes, name_sensor, avg, date, isRunning) 
+            VALUES (?, ?, ?, NOW(), ?)`, 
+            [treeID, "WaterUsage", waterUsageToday, 1]
+        );
+
+        console.log(` נתוני המים נשמרו בטבלה datasensors עבור עץ ${treeID}: ${waterUsageToday} מ"ל`);
+        res.status(201).json({ message: `נתוני המים נשמרו בהצלחה עבור עץ ${treeID}!` });
+
+    } catch (error) {
+        console.error(' שגיאה בשליחת נתוני המים:', error);
+        res.status(500).json({ message: `שגיאה בשרת: ${error.sqlMessage || error.message}` });
+    }
+});
+
+
+
+// **נתיב לקבלת נתוני צריכת מים מתוך datasensors**
+router.get('/waterUsage/:treeID', async (req, res) => {
+    try {
+        const { treeID } = req.params;
+        if (!treeID) {
+            return res.status(400).json({ message: 'חסר treeID בשאילתא' });
+        }
+
+        let [waterData] = await db.execute(`
+            SELECT avg AS waterAmount, date FROM datasensors 
+            WHERE id_threes = ? AND name_sensor = "WaterUsage" 
+            ORDER BY date DESC LIMIT 1`, 
+            [treeID]
+        );
+
+        if (waterData.length === 0) {
+            return res.status(404).json({ message: 'לא נמצאו נתוני צריכת מים לעץ זה' });
+        }
+
+        res.json(waterData[0]);
+
+    } catch (error) {
+        console.error('שגיאה בשליפת נתוני המים:', error);
+        res.status(500).json({ message: 'שגיאה בשרת' });
     }
 });
 
